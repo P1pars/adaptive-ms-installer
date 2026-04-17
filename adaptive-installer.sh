@@ -1,6 +1,12 @@
+#!/usr/bin/env bash
 set -euo pipefail
 
 INSTALL_DIR="/opt/adaptive-ms"
+
+if [[ "$EUID" -ne 0 ]]; then
+  echo "Lūdzu palaidiet šo skriptu ar sudo."
+  exit 1
+fi
 
 echo "=== Adaptive MS instalators ==="
 
@@ -113,7 +119,7 @@ set -a
 source "$INSTALL_DIR/.env"
 set +a
 
-HASH=$(docker exec adaptive-ms node -e "const bcrypt = require('bcryptjs'); console.log(bcrypt.hashSync(process.argv[1], 10));" "$ADMIN_PASSWORD")
+HASH=$(sudo docker exec adaptive-ms node -e "const bcrypt = require('bcryptjs'); console.log(bcrypt.hashSync(process.argv[1], 10));" "$ADMIN_PASSWORD")
 
 sudo docker exec -i adaptive-db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto;'
 
@@ -134,12 +140,29 @@ else
   COMPOSE_CMD="docker-compose"
 fi
 
-$COMPOSE_CMD down -v || true
+echo
+echo "Pārbauda Docker Hub piekļuvi Adaptive MS attēlam..."
+
+if ! docker pull hubadaptive/adaptive-ms:latest >/dev/null 2>&1; then
+  echo "Kļūda: neizdevās lejupielādēt hubadaptive/adaptive-ms:latest"
+  echo "Pārliecinieties, ka esat izpildījis: docker login -u hubadaptive"
+  exit 1
+fi
+
+echo "Docker Hub piekļuve ir veiksmīga."
+
+read -rp "Vai dzēst esošos konteinerus un datubāzes datus? [y/N]: " RESET_STACK
+if [[ "$RESET_STACK" =~ ^[Yy]$ ]]; then
+  $COMPOSE_CMD down -v || true
+else
+  $COMPOSE_CMD down || true
+fi
+
 $COMPOSE_CMD up -d
 
 echo
 echo "Gaida, kamēr PostgreSQL būs gatavs darbam..."
-until docker exec adaptive-db pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; do
+until sudo docker exec adaptive-db pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; do
   sleep 2
 done
 
