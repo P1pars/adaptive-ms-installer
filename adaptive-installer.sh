@@ -115,9 +115,9 @@ set +a
 
 HASH=$(docker exec adaptive-ms node -e "const bcrypt = require('bcryptjs'); console.log(bcrypt.hashSync(process.argv[1], 10));" "$ADMIN_PASSWORD")
 
-docker exec -i adaptive-db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto;'
+sudo docker exec -i adaptive-db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto;'
 
-docker exec -i adaptive-db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
+sudo docker exec -i adaptive-db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
 INSERT INTO \"User\" (id, email, username, \"passwordHash\", role, created_at)
 VALUES (gen_random_uuid()::text, '$ADMIN_EMAIL', '$ADMIN_USERNAME', '$HASH', 'ADMIN', NOW())
 ON CONFLICT (email) DO NOTHING;
